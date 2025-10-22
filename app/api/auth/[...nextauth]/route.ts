@@ -1,10 +1,10 @@
-import NextAuth from 'next-auth'
+import NextAuth, { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcrypt'
 import { query } from '@/lib/db'
 import { User } from '@/lib/types'
 
-const handler = NextAuth({
+export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -14,45 +14,34 @@ const handler = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          return null
+          throw new Error('Email and password required')
         }
 
-        try {
-          const result = await query<User>(
-  'SELECT * FROM users WHERE email = $1 AND is_active = true',
-  [credentials.email]
-);
+        const result = await query<User>(
+          'SELECT * FROM users WHERE email = $1 AND is_active = true',
+          [credentials.email]
+        )
 
-console.log('Query result:', result.rows);
+        const user = result.rows[0]
 
-const user = result.rows[0];
-if (!user) {
-  console.log('User not found or inactive');
-  return null;
-}
+        if (!user) {
+          throw new Error('Invalid credentials')
+        }
 
-          if (!user) {
-            return null
-          }
+        const isPasswordValid = await bcrypt.compare(
+          credentials.password,
+          user.password
+        )
 
-          const isPasswordValid = await bcrypt.compare(
-            credentials.password,
-            user.password
-          )
+        if (!isPasswordValid) {
+          throw new Error('Invalid credentials')
+        }
 
-          if (!isPasswordValid) {
-            return null
-          }
-
-          return {
-            id: user.id.toString(),
-            email: user.email,
-            name: user.name,
-            role: user.role
-          } as any
-        } catch (error) {
-          console.error('Auth error:', error)
-          return null
+        return {
+          id: user.id.toString(),
+          email: user.email,
+          name: user.name,
+          role: user.role
         }
       }
     })
@@ -71,6 +60,14 @@ if (!user) {
         (session.user as any).id = token.id
       }
       return session
+    },
+    async redirect({ url, baseUrl }) {
+      // Jika ada callbackUrl, gunakan itu
+      if (url.startsWith(baseUrl)) {
+        return url
+      }
+      // Default redirect ke baseUrl
+      return baseUrl
     }
   },
   pages: {
@@ -80,6 +77,8 @@ if (!user) {
     strategy: 'jwt',
   },
   secret: process.env.NEXTAUTH_SECRET,
-})
+}
+
+const handler = NextAuth(authOptions)
 
 export { handler as GET, handler as POST }

@@ -385,7 +385,7 @@ export default function MenusPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white text-gray-900 shadow-lg">
                     {categories.map((category) => (
                       <SelectItem key={category.id} value={category.id.toString()}>
                         {category.name}
@@ -472,7 +472,7 @@ export default function MenusPage() {
                             <SelectTrigger>
                               <SelectValue placeholder="Select material" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="bg-white text-gray-900 shadow-lg">
                               {materials.map((mat) => (
                                 <SelectItem key={mat.id} value={mat.id.toString()}>
                                   {mat.name} (Stock: {mat.stock} {mat.unit})

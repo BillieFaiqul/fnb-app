@@ -1,18 +1,36 @@
 'use client'
 
 import { useState, FormEvent } from 'react'
-import { signIn } from 'next-auth/react'
+import { signIn, useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useEffect } from 'react'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { data: session, status } = useSession()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  // Redirect jika sudah login
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user) {
+      const role = session.user.role
+      
+      // Redirect berdasarkan role
+      if (role === 'admin') {
+        router.push('/admin')
+      } else if (role === 'cashier') {
+        router.push('/cashier')
+      } else if (role === 'customer') {
+        router.push('/customer')
+      }
+    }
+  }, [status, session, router])
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -28,15 +46,33 @@ export default function LoginPage() {
 
       if (result?.error) {
         setError('Email atau password salah')
+        setIsLoading(false)
       } else {
-        router.push('/admin')
+        // Success - useEffect akan handle redirect
         router.refresh()
       }
     } catch (error) {
       setError('Terjadi kesalahan')
-    } finally {
       setIsLoading(false)
     }
+  }
+
+  // Jika sedang loading session
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading...</div>
+      </div>
+    )
+  }
+
+  // Jika sudah login, tampilkan loading
+  if (status === 'authenticated') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Redirecting...</div>
+      </div>
+    )
   }
 
   return (
@@ -91,9 +127,11 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-4 text-center text-sm text-gray-500">
-            <p>Demo Account:</p>
+          <div className="mt-4 text-center text-sm text-gray-500 space-y-1">
+            <p className="font-semibold">Demo Accounts:</p>
             <p>Admin: admin@fnb.com / password123</p>
+            <p>Kasir: kasir1@fnb.com / password123</p>
+            <p>Customer: customer@test.com / password123</p>
           </div>
         </CardContent>
       </Card>
