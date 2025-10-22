@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
+import { Package } from 'lucide-react'
 
 interface Menu {
   id: number
@@ -16,6 +17,14 @@ interface Menu {
   category_name: string
   is_available: boolean
   image: string | null
+  max_servings: number
+  materials: Array<{
+    material_name: string
+    quantity_needed: number
+    current_stock: number
+    unit: string
+    max_servings: number
+  }>
 }
 
 interface CartItem {
@@ -32,7 +41,6 @@ export default function DirectOrder() {
   const [isLoading, setIsLoading] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
 
-  // Fetch available menus
   useEffect(() => {
     fetchMenus()
   }, [])
@@ -55,7 +63,15 @@ export default function DirectOrder() {
 
   const addToCart = (menu: Menu) => {
     const existingItem = cart.find(item => item.menu.id === menu.id)
-    
+    const currentQty = existingItem ? existingItem.quantity : 0
+    const availableQty = menu.max_servings - currentQty
+
+    if (availableQty <= 0) {
+      toast.error(`Stok ${menu.name} tidak cukup`)
+      return
+    }
+
+    // Update cart - TIDAK ada API call di sini
     if (existingItem) {
       setCart(cart.map(item =>
         item.menu.id === menu.id
@@ -65,20 +81,36 @@ export default function DirectOrder() {
     } else {
       setCart([...cart, { menu, quantity: 1 }])
     }
-    
+
     toast.success(`${menu.name} ditambahkan`)
   }
 
-  const updateQuantity = (menuId: number, quantity: number) => {
-    if (quantity <= 0) {
+  const updateQuantity = (menuId: number, newQuantity: number) => {
+    if (newQuantity <= 0) {
       removeFromCart(menuId)
       return
     }
-    
-    setCart(cart.map(item =>
-      item.menu.id === menuId
-        ? { ...item, quantity }
-        : item
+
+    const item = cart.find(i => i.menu.id === menuId)
+    if (!item) return
+
+    const menu = menus.find(m => m.id === menuId)
+    if (!menu) return
+
+    const currentCartQty = item.quantity
+    const availableQty = menu.max_servings - currentCartQty
+
+    // Check if increase is possible
+    if (newQuantity > currentCartQty && availableQty <= 0) {
+      toast.error(`Stok ${menu.name} tidak cukup`)
+      return
+    }
+
+    // Update cart - TIDAK ada API call di sini
+    setCart(cart.map(i =>
+      i.menu.id === menuId
+        ? { ...i, quantity: newQuantity }
+        : i
     ))
   }
 
@@ -116,6 +148,7 @@ export default function DirectOrder() {
     setIsProcessing(true)
 
     try {
+      // Hanya satu API call saat payment - di sini stok berkurang
       const res = await fetch('/api/orders/cashier', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -141,7 +174,7 @@ export default function DirectOrder() {
         setPaidAmount('')
         setPaymentMethod('cash')
         
-        // Refresh menus (untuk update stok)
+        // Refresh menus to get updated stock
         fetchMenus()
       } else {
         toast.error(data.error || 'Pembayaran gagal')
@@ -183,30 +216,56 @@ export default function DirectOrder() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {categoryMenus.map(menu => (
-                    <button
-                      key={menu.id}
-                      onClick={() => menu.is_available && addToCart(menu)}
-                      disabled={!menu.is_available}
-                      className={`p-4 rounded-lg border-2 text-left transition-all ${
-                        menu.is_available
-                          ? 'border-gray-200 hover:border-blue-500 hover:shadow-md cursor-pointer'
-                          : 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-60'
-                      }`}
-                    >
-                      <div className="font-semibold text-gray-900 mb-1">
-                        {menu.name}
-                      </div>
-                      <div className="text-sm text-gray-600 mb-2">
-                        Rp {menu.price.toLocaleString('id-ID')}
-                      </div>
-                      {!menu.is_available && (
-                        <Badge variant="destructive" className="text-xs">
-                          Habis
-                        </Badge>
-                      )}
-                    </button>
-                  ))}
+                  {categoryMenus.map(menu => {
+                    const cartQty = cart.find(item => item.menu.id === menu.id)?.quantity || 0
+                    const availableQty = menu.max_servings - cartQty
+
+                    return (
+                      <button
+                        key={menu.id}
+                        onClick={() => menu.is_available && availableQty > 0 && addToCart(menu)}
+                        disabled={!menu.is_available || availableQty <= 0}
+                        className={`p-4 rounded-lg border-2 text-left transition-all ${
+                          menu.is_available && availableQty > 0
+                            ? 'border-gray-200 hover:border-blue-500 hover:shadow-md cursor-pointer'
+                            : 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-60'
+                        }`}
+                      >
+                        {menu.image && (
+                          <img 
+                            src={menu.image} 
+                            alt={menu.name}
+                            className="w-full h-24 object-cover rounded mb-2"
+                          />
+                        )}
+                        <div className="font-semibold text-gray-900 mb-1">
+                          {menu.name}
+                        </div>
+                        <div className="text-sm text-gray-600 mb-2">
+                          Rp {menu.price.toLocaleString('id-ID')}
+                        </div>
+                        
+                        <div className="flex items-center gap-2 text-xs">
+                          <Package className="h-3 w-3 text-gray-500" />
+                          <span className={availableQty > 0 ? 'text-green-600' : 'text-red-600'}>
+                            Stok: {availableQty}
+                          </span>
+                        </div>
+
+                        {cartQty > 0 && (
+                          <Badge variant="secondary" className="text-xs mt-2">
+                            Di keranjang: {cartQty}
+                          </Badge>
+                        )}
+
+                        {(!menu.is_available || availableQty <= 0) && (
+                          <Badge variant="destructive" className="text-xs mt-2">
+                            Habis
+                          </Badge>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -216,7 +275,6 @@ export default function DirectOrder() {
 
       {/* Cart & Payment */}
       <div className="space-y-4">
-        {/* Cart */}
         <Card>
           <CardHeader>
             <CardTitle>Keranjang</CardTitle>
@@ -269,7 +327,6 @@ export default function DirectOrder() {
           </CardContent>
         </Card>
 
-        {/* Payment */}
         {cart.length > 0 && (
           <Card>
             <CardHeader>
