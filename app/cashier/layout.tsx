@@ -1,10 +1,11 @@
 'use client'
 
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { signOut } from 'next-auth/react'
+import Link from 'next/link'
 
 export default function CashierLayout({
   children,
@@ -13,6 +14,7 @@ export default function CashierLayout({
 }) {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -40,6 +42,7 @@ export default function CashierLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="px-6 py-4 flex items-center justify-between">
           <div>
@@ -48,7 +51,23 @@ export default function CashierLayout({
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="text-right">
+            <Link href="/cashier">
+              <Button 
+                variant={pathname === '/cashier' ? 'default' : 'ghost'} 
+                size="sm"
+              >
+                Order
+              </Button>
+            </Link>
+            <Link href="/cashier/history">
+              <Button 
+                variant={pathname === '/cashier/history' ? 'default' : 'ghost'} 
+                size="sm"
+              >
+                History
+              </Button>
+            </Link>
+            <div className="text-right ml-4">
               <p className="text-sm font-medium text-gray-900">{session.user.name}</p>
               <p className="text-xs text-gray-500">{session.user.email}</p>
             </div>
@@ -62,6 +81,8 @@ export default function CashierLayout({
           </div>
         </div>
       </header>
+
+      {/* Main Content */}
       <main className="p-6">
         {children}
       </main>

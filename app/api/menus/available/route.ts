@@ -4,10 +4,15 @@ import { Menu } from '@/lib/types'
 
 export async function GET() {
   try {
-    // Query untuk cek menu yang available dengan informasi stok
+    // Query untuk cek menu yang available dengan max servings
     const result = await query(`
       SELECT 
-        m.*,
+        m.id,
+        m.name,
+        m.description,
+        m.price,
+        m.image,
+        m.is_active,
         c.name AS category_name,
         CASE 
           WHEN m.is_active = false THEN false
@@ -20,47 +25,46 @@ export async function GET() {
           ) THEN false
           ELSE true
         END AS is_available,
+        -- Hitung max servings berdasarkan material paling sedikit
         COALESCE(
-          json_agg(
-            json_build_object(
-              'material_id', mat.id,
-              'material_name', mat.name,
-              'quantity_needed', mm.quantity_needed,
-              'current_stock', mat.stock,
-              'unit', mat.unit,
-              'max_servings', FLOOR(mat.stock / NULLIF(mm.quantity_needed, 0))
-            )
-          ) FILTER (WHERE mat.id IS NOT NULL),
-          '[]'
-        ) as materials
+          (
+            SELECT MIN(FLOOR(mat.stock / mm.quantity_needed))
+            FROM menu_materials mm
+            JOIN materials mat ON mm.material_id = mat.id
+            WHERE mm.menu_id = m.id
+          ), 0
+        ) AS max_servings
       FROM menus m
       LEFT JOIN categories c ON m.category_id = c.id
-      LEFT JOIN menu_materials mm ON m.id = mm.menu_id
-      LEFT JOIN materials mat ON mm.material_id = mat.id
       WHERE m.is_active = true
-      GROUP BY m.id, c.name
-      ORDER BY m.name
+      ORDER BY c.name, m.name
     `)
 
-    // Calculate max servings untuk setiap menu
-    const menusWithStock = result.rows.map((menu: any) => {
-      const materials = menu.materials || []
-      
-      // Cari material dengan max_servings terkecil (bottleneck)
-      const maxServings = materials.length > 0
-        ? Math.min(...materials.map((m: any) => m.max_servings || 0))
-        : 0
+    // Get materials detail for each menu
+    const menusWithMaterials = await Promise.all(
+      result.rows.map(async (menu) => {
+        const materialsResult = await query(`
+          SELECT 
+            mat.name AS material_name,
+            mm.quantity_needed,
+            mat.stock AS current_stock,
+            mat.unit,
+            FLOOR(mat.stock / mm.quantity_needed) AS max_servings
+          FROM menu_materials mm
+          JOIN materials mat ON mm.material_id = mat.id
+          WHERE mm.menu_id = $1
+        `, [menu.id])
 
-      return {
-        ...menu,
-        max_servings: maxServings,
-        is_available: menu.is_available && maxServings > 0
-      }
-    })
+        return {
+          ...menu,
+          materials: materialsResult.rows
+        }
+      })
+    )
 
     return NextResponse.json({
       success: true,
-      data: menusWithStock
+      data: menusWithMaterials
     })
   } catch (error) {
     console.error('Error fetching available menus:', error)

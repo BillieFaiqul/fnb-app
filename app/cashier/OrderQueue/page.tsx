@@ -170,7 +170,7 @@ export default function OrderQueue() {
 
       {/* Payment Dialog */}
       <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
-        <DialogContent>
+        <DialogContent className='bg-white'>
           <DialogHeader>
             <DialogTitle>Proses Pembayaran</DialogTitle>
           </DialogHeader>

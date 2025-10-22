@@ -130,8 +130,8 @@ export default function LoginPage() {
           <div className="mt-4 text-center text-sm text-gray-500 space-y-1">
             <p className="font-semibold">Demo Accounts:</p>
             <p>Admin: admin@fnb.com / password123</p>
-            <p>Kasir: kasir1@fnb.com / password123</p>
-            <p>Customer: customer@test.com / password123</p>
+            <p>Kasir: kasir1@fnb.com / password1234</p>
+            <p>Customer: customer@test.com / password12345</p>
           </div>
         </CardContent>
       </Card>

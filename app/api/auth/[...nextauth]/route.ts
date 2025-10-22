@@ -60,14 +60,6 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).id = token.id
       }
       return session
-    },
-    async redirect({ url, baseUrl }) {
-      // Jika ada callbackUrl, gunakan itu
-      if (url.startsWith(baseUrl)) {
-        return url
-      }
-      // Default redirect ke baseUrl
-      return baseUrl
     }
   },
   pages: {
